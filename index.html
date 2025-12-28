@@ -1,0 +1,420 @@
+This is the Ultimate Version.
+
+New Features Added:
+Diet Preference Toggle: A new dropdown for Vegetarian, Veg + Egg (Eggetarian), and Non-Veg.
+
+Non-Veg/Egg Logic: Automatically swaps "Paneer/Dal" with "Chicken/Fish/Omelettes" where appropriate, while keeping the calorie/cooking style logic from the BMI section intact.
+
+Tracking Checkboxes: Every meal now has a checkbox.
+
+Strikethrough Effect: When you check a meal, it crosses out the text so you feel accomplished.
+
+Memory: It uses your browser's local storage. If you close the browser and come back tomorrow, your checked boxes will still be there!
+
+Save this code as tracker_diet.html.
+
+HTML
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Diet Tracker</title>
+    <style>
+        :root {
+            --primary: #00796b;
+            --light: #e0f2f1;
+            --bg: #f5f7fa;
+            --text: #2c3e50;
+            --loss: #e74c3c;
+            --gain: #27ae60;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        /* Settings Panel */
+        .panel {
+            background: white; padding: 25px; border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-bottom: 25px;
+            border-left: 6px solid var(--primary);
+            display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;
+        }
+        .input-group { display: flex; flex-direction: column; flex: 1; min-width: 130px; }
+        label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #7f8c8d; margin-bottom: 5px; letter-spacing: 0.5px; }
+        input, select { padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; font-size: 1rem; width: 100%; box-sizing: border-box; background: #fff; }
+        select { cursor: pointer; }
+        button { 
+            background: var(--primary); color: white; border: none; padding: 12px 30px; 
+            border-radius: 6px; cursor: pointer; font-weight: bold; flex: 0 0 auto; transition: 0.2s;
+        }
+        button:hover { background: #004d40; transform: translateY(-2px); }
+
+        /* Stats Row */
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .val { font-size: 1.6rem; font-weight: 800; color: var(--primary); }
+        .lbl { font-size: 0.85rem; color: #7f8c8d; }
+
+        /* Banner */
+        .mode-banner {
+            padding: 15px; margin-bottom: 20px; border-radius: 8px; font-weight: bold; text-align: center;
+            display: none; font-size: 1.1rem;
+        }
+        .mode-loss { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .mode-gain { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .mode-maintain { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+
+        /* Tabs */
+        .tabs { overflow-x: auto; white-space: nowrap; padding-bottom: 10px; margin-bottom: 15px; }
+        .tab-btn { 
+            padding: 10px 25px; border: none; background: #dfe6e9; margin-right: 10px; 
+            border-radius: 25px; cursor: pointer; font-weight: 600; color: #636e72; transition: 0.2s;
+        }
+        .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(0,121,107, 0.3); }
+
+        /* Tracking Table */
+        .day-content { display: none; background: white; padding: 5px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .day-content.active { display: block; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 18px 15px; border-bottom: 1px solid #f1f1f1; vertical-align: top; }
+        tr:last-child td { border-bottom: none; }
+        
+        .meal-col { width: 15%; font-weight: 700; color: var(--primary); font-size: 0.95rem; }
+        
+        /* Checkbox & Tracking Styles */
+        .track-row { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+        .track-box { 
+            width: 22px; height: 22px; border: 2px solid #bdc3c7; border-radius: 6px; 
+            display: grid; place-items: center; flex-shrink: 0; margin-top: 2px; transition: 0.2s;
+        }
+        input[type="checkbox"] { display: none; } /* Hide default checkbox */
+        
+        /* Checked State */
+        input[type="checkbox"]:checked + .track-box { background: var(--primary); border-color: var(--primary); }
+        input[type="checkbox"]:checked + .track-box::after { content: '✓'; color: white; font-weight: bold; font-size: 14px; }
+        
+        /* Strikethrough Effect */
+        input[type="checkbox"]:checked ~ .meal-text { text-decoration: line-through; color: #bdc3c7; }
+        
+        .meal-text { line-height: 1.5; font-size: 1rem; transition: 0.3s; }
+        .reset-link { text-align: right; padding: 10px; font-size: 0.8rem; color: #999; cursor: pointer; }
+
+        /* Dynamic Tags */
+        .dyn { font-weight: bold; padding: 2px 6px; border-radius: 4px; }
+        .dyn-loss { background-color: #ffebee; color: #c0392b; }
+        .dyn-gain { background-color: #e8f5e9; color: #27ae60; }
+
+        @media (max-width: 600px) {
+            .panel { flex-direction: column; }
+            td { display: block; padding: 10px 15px; }
+            .meal-col { margin-bottom: 5px; color: #888; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="panel">
+        <div class="input-group"><label>Height (Ft)</label><input type="number" id="feet" value="5"></div>
+        <div class="input-group"><label>Inches</label><input type="number" id="inches" value="3"></div>
+        <div class="input-group"><label>Weight (Kg)</label><input type="number" id="weight" value="82"></div>
+        <div class="input-group"><label>Age</label><input type="number" id="age" value="24"></div>
+        <div class="input-group">
+            <label>Preference</label>
+            <select id="diet-type">
+                <option value="veg">Vegetarian</option>
+                <option value="egg">Veg (With Egg)</option>
+                <option value="nonveg">Non-Veg</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Activity</label>
+            <select id="activity">
+                <option value="1.2">Sedentary</option>
+                <option value="1.375">Light Activity</option>
+                <option value="1.55">Moderate Activity</option>
+            </select>
+        </div>
+        <button onclick="generatePlan()">Update Plan ↻</button>
+    </div>
+
+    <div class="stats-row">
+        <div class="card"><div class="val" id="bmi-val">--</div><div class="lbl">BMI Score</div></div>
+        <div class="card"><div class="val" id="cal-target">--</div><div class="lbl">Daily Calories</div></div>
+        <div class="card"><div class="val" id="water-target">--</div><div class="lbl">Water Goal</div></div>
+        <div class="card"><div class="val" id="protein-target">--</div><div class="lbl">Protein Goal</div></div>
+    </div>
+
+    <div id="mode-banner" class="mode-banner"></div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab('Mon')">Monday</button>
+        <button class="tab-btn" onclick="openTab('Tue')">Tuesday</button>
+        <button class="tab-btn" onclick="openTab('Wed')">Wednesday</button>
+        <button class="tab-btn" onclick="openTab('Thu')">Thursday</button>
+        <button class="tab-btn" onclick="openTab('Fri')">Friday</button>
+        <button class="tab-btn" onclick="openTab('Sat')">Saturday</button>
+        <button class="tab-btn" onclick="openTab('Sun')">Sunday</button>
+    </div>
+
+    <div id="diet-container"></div>
+    <div class="reset-link" onclick="clearTracking()">[Reset All Checkboxes]</div>
+
+</div>
+
+<script>
+    // --- DATA & LOGIC ---
+
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    // Base Menu Structure
+    const menuBase = {
+        'Mon': { b: 'besan', l: 'dal', s: 'makhana', d: 'paneer' },
+        'Tue': { b: 'oats', l: 'chole', s: 'chana', d: 'soya' },
+        'Wed': { b: 'sandwich', l: 'moong', s: 'fruit', d: 'khichdi' },
+        'Thu': { b: 'moong_chilla', l: 'rajma', s: 'makhana', d: 'tofu' },
+        'Fri': { b: 'poha', l: 'masoor', s: 'chana', d: 'tikka' },
+        'Sat': { b: 'toast', l: 'mixdal', s: 'coffee', d: 'cheela' },
+        'Sun': { b: 'fruit', l: 'cheat', s: 'greentea', d: 'soup' }
+    };
+
+    function generatePlan() {
+        // 1. Get Inputs
+        let ft = parseFloat(document.getElementById('feet').value);
+        let inch = parseFloat(document.getElementById('inches').value);
+        let weight = parseFloat(document.getElementById('weight').value);
+        let age = parseFloat(document.getElementById('age').value);
+        let act = parseFloat(document.getElementById('activity').value);
+        let dietType = document.getElementById('diet-type').value;
+
+        // 2. Calculations
+        let h_m = ((ft * 12) + inch) * 0.0254;
+        let bmi = (weight / (h_m * h_m)).toFixed(1);
+        let bmr = (10 * weight) + (6.25 * h_m * 100) - (5 * age) - 161;
+        let tdee = Math.round(bmr * act);
+        let deficit = tdee - 500;
+        if(deficit < 1200) deficit = 1200;
+
+        // 3. Update Stats
+        document.getElementById('bmi-val').innerText = bmi;
+        document.getElementById('cal-target').innerText = deficit + " kcal";
+        document.getElementById('water-target').innerText = (weight * 0.033).toFixed(1) + " L";
+        document.getElementById('protein-target').innerText = Math.round(weight * 0.9) + "g";
+
+        // 4. Mode Logic
+        let mode = 'maintain';
+        let banner = document.getElementById('mode-banner');
+        let cssClass = "";
+        
+        let msg = "";
+
+        if (bmi >= 25) {
+            mode = 'loss';
+            msg = "⚠️ Mode: FAT LOSS (Strict Ingredients, Less Oil)";
+            banner.className = "mode-banner mode-loss";
+            cssClass = "dyn-loss";
+        } else if (bmi < 18.5) {
+            mode = 'gain';
+            msg = "💪 Mode: HEALTHY GAIN (Nutrient Dense, Good Fats)";
+            banner.className = "mode-banner mode-gain";
+            cssClass = "dyn-gain";
+        } else {
+            msg = "✅ Mode: MAINTENANCE (Balanced)";
+            banner.className = "mode-banner mode-maintain";
+        }
+        banner.innerText = msg;
+        banner.style.display = 'block';
+
+        // 5. Generate Tables
+        let container = document.getElementById('diet-container');
+        container.innerHTML = ""; // Clear existing
+
+        days.forEach(day => {
+            let dayDiv = document.createElement('div');
+            dayDiv.id = day;
+            dayDiv.className = 'day-content';
+            if(day === 'Mon') dayDiv.classList.add('active');
+
+            let meals = getMeals(day, dietType, mode, deficit, cssClass);
+
+            let html = `<table>`;
+            html += createRow(day, 'Breakfast', meals.b);
+            html += createRow(day, 'Lunch', meals.l);
+            html += createRow(day, 'Snack', meals.s);
+            html += createRow(day, 'Dinner', meals.d);
+            html += `</table>`;
+
+            dayDiv.innerHTML = html;
+            container.appendChild(dayDiv);
+        });
+
+        // Restore Checkbox State
+        restoreChecks();
+    }
+
+    function createRow(day, type, text) {
+        let id = `${day}-${type}`;
+        return `<tr>
+            <td class="meal-col">${type}</td>
+            <td>
+                <label class="track-row">
+                    <input type="checkbox" id="${id}" onchange="saveCheck('${id}')">
+                    <span class="track-box"></span>
+                    <span class="meal-text">${text}</span>
+                </label>
+            </td>
+        </tr>`;
+    }
+
+    // --- FOOD MAPPING ENGINE ---
+    function getMeals(day, diet, mode, cal, css) {
+        let m = menuBase[day];
+        return {
+            b: format(getFood(m.b, 'breakfast', diet, mode), cal, css),
+            l: format(getFood(m.l, 'lunch', diet, mode), cal, css),
+            s: format(getFood(m.s, 'snack', diet, mode), cal, css),
+            d: format(getFood(m.d, 'dinner', diet, mode), cal, css)
+        };
+    }
+
+    // The Logic Brain: Converts code + diet + mode into Food Text
+    function getFood(code, mealTime, diet, mode) {
+        
+        // --- 1. PREPARE MODIFIERS ---
+        let cookStyle = (mode === 'loss') ? "Steamed/Less Oil" : (mode === 'gain' ? "Ghee Roast" : "Light Oil");
+        let rotiType = (mode === 'loss') ? "Bran Roti" : "Wheat Roti";
+        let milkType = (mode === 'loss') ? "Skim Milk" : "Full Cream Milk";
+        
+        // --- 2. DIET SWAPS (VEG vs NON-VEG vs EGG) ---
+        
+        // BREAKFAST SWAPS
+        if (mealTime === 'breakfast') {
+            if (code === 'besan' || code === 'moong_chilla') {
+                if (diet === 'egg' || diet === 'nonveg') return `2 Egg Omelette (${cookStyle}) + Toast`;
+            }
+            if (code === 'sandwich') {
+                if (diet === 'egg' || diet === 'nonveg') return `Egg Sandwich (2 Boiled Eggs)`;
+            }
+            if (code === 'poha' && diet !== 'veg') return `Egg Poha (2 Scrambled Eggs mixed)`;
+            // Default returns
+            if (code === 'besan') return `2 Besan Chillas (${cookStyle}) + Mint Chutney`;
+            if (code === 'moong_chilla') return `2 Moong Dal Chillas (${cookStyle})`;
+            if (code === 'oats') return `Oats Porridge + ${milkType} + Apple`;
+            if (code === 'sandwich') return `Paneer Sandwich (Raw Paneer)`;
+            if (code === 'poha') return `Veg Poha with Peanuts`;
+            if (code === 'toast') return `Avocado/Paneer Toast`;
+            if (code === 'fruit') return `Bowl of Papaya + 5 Almonds`;
+        }
+
+        // LUNCH SWAPS (Always Roti + Protein)
+        if (mealTime === 'lunch') {
+            let protein = "";
+            
+            // Standard Veg bases
+            if (code === 'dal') protein = "Arhar Dal";
+            if (code === 'chole') protein = "Chole (Chickpeas)";
+            if (code === 'moong') protein = "Yellow Moong Dal";
+            if (code === 'rajma') protein = "Rajma (Kidney Beans)";
+            if (code === 'masoor') protein = "Masoor Dal";
+            if (code === 'mixdal') protein = "Mix Dal Tadka";
+            if (code === 'cheat') return (mode==='loss') ? "Homemade Chicken/Paneer Rice (Controlled)" : "Full Cheat Meal!";
+
+            // Overrides for Egg/NonVeg
+            if (diet === 'egg') protein = "Egg Curry (2 Eggs)";
+            if (diet === 'nonveg') {
+                 // Alternating Chicken and Fish/Egg for variety
+                 if (['Mon','Wed','Fri'].includes(code)) protein = `Chicken Curry (${cookStyle})`; 
+                 else protein = `Fish Curry / Egg Curry`;
+            }
+
+            return `1 ${rotiType} + ${protein} + Salad`;
+        }
+
+        // SNACK SWAPS
+        if (mealTime === 'snack') {
+            if (code === 'greentea') return "Green Tea (No Sugar)";
+            if (code === 'coffee') return `Cold Coffee (${milkType}, No Sugar)`;
+            if (code === 'makhana') return "Green Tea + Roasted Makhana";
+            if (code === 'chana') return "Black Coffee + Roasted Chana";
+            if (code === 'fruit') return "Green Tea + Seasonal Fruit";
+        }
+
+        // DINNER SWAPS
+        if (mealTime === 'dinner') {
+            if (code === 'soup') return (mode === 'loss') ? "Clear Soup + Salad (Detox)" : "Soup + Grilled Sandwich";
+            
+            let dish = "";
+            if (code === 'paneer') dish = "Paneer Bhurji";
+            if (code === 'soya') dish = "Soya Chunk Pulao";
+            if (code === 'khichdi') return "Dal Khichdi + Curd"; // Comfort food, keep veg mostly
+            if (code === 'tofu') dish = "Tofu Stir Fry";
+            if (code === 'tikka') dish = "Paneer Tikka";
+            if (code === 'cheela') return "2 Besan Cheelas + Curd"; // Light dinner
+
+            // Overrides
+            if (diet === 'egg') {
+                if (code === 'paneer' || code === 'tofu') dish = "Egg Bhurji (2 Eggs)";
+                if (code === 'tikka') dish = "Boiled Egg Chat";
+            }
+            if (diet === 'nonveg') {
+                if (code === 'paneer' || code === 'tofu') dish = `Grilled Chicken (${cookStyle})`;
+                if (code === 'tikka') dish = "Chicken Tikka (Home made)";
+                if (code === 'soya') dish = "Chicken Pulao";
+            }
+
+            let carb = (mode === 'loss') ? "+ Big Salad (No Roti)" : "+ 1 Toast/Roti";
+            return `${dish} ${carb}`;
+        }
+        
+        return code;
+    }
+
+    function format(text, cal, css) {
+        // Just a helper to maybe bold items or wrap in spans if needed
+        return `<span class="${css}">${text}</span>`;
+    }
+
+    // --- UI LOGIC ---
+    function openTab(id) {
+        document.querySelectorAll('.day-content').forEach(d => d.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    // --- LOCAL STORAGE (The Memory) ---
+    function saveCheck(id) {
+        let checkbox = document.getElementById(id);
+        if (checkbox.checked) {
+            localStorage.setItem(id, 'true');
+        } else {
+            localStorage.removeItem(id);
+        }
+    }
+
+    function restoreChecks() {
+        let inputs = document.querySelectorAll('input[type="checkbox"]');
+        inputs.forEach(input => {
+            if (localStorage.getItem(input.id) === 'true') {
+                input.checked = true;
+            }
+        });
+    }
+
+    function clearTracking() {
+        if(confirm('Uncheck all meals?')) {
+            localStorage.clear();
+            generatePlan(); // Refresh to clear UI
+        }
+    }
+
+    // Init
+    window.onload = generatePlan;
+
+</script>
+
+</body>
+</html>
